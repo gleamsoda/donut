@@ -68,9 +68,15 @@ func (a *App) createTemplates() error {
 	return nil
 }
 
-type templateData struct {
+type diffTemplateData struct {
 	Source      string
 	Destination string
+}
+
+type mergeTemplateData struct {
+	Source      string
+	Destination string
+	Base        string
 }
 
 func (a *App) Init(_ context.Context) error {
@@ -144,7 +150,7 @@ func (a *App) Diff(ctx context.Context) error {
 				}
 
 				argsBuilder := strings.Builder{}
-				if err := a.template.ExecuteTemplate(&argsBuilder, "diff", templateData(pm)); err != nil {
+				if err := a.template.ExecuteTemplate(&argsBuilder, "diff", diffTemplateData(pm)); err != nil {
 					return err
 				}
 				args := strings.Split(argsBuilder.String(), " ")
@@ -200,8 +206,30 @@ func (a *App) Merge(ctx context.Context) error {
 			continue
 		}
 
+		var be *FileEntry
+		if err := a.Store.Get(FileEntryBucket, pm.Destination, &be); err != nil {
+			return err
+		}
+		bc, err := be.GetContent()
+		if err != nil {
+			return err
+		}
+		f, err := os.CreateTemp("", fmt.Sprintf("%s.base.*", filepath.Base(pm.Destination)))
+		if err != nil {
+			return err
+		}
+		defer os.Remove(f.Name())
+		if _, err := io.Copy(f, bytes.NewReader(bc)); err != nil {
+			return err
+		}
+
+		data := mergeTemplateData{
+			Source:      pm.Source,
+			Destination: pm.Destination,
+			Base:        f.Name(),
+		}
 		argsBuilder := strings.Builder{}
-		if err := a.template.ExecuteTemplate(&argsBuilder, "merge", templateData(pm)); err != nil {
+		if err := a.template.ExecuteTemplate(&argsBuilder, "merge", data); err != nil {
 			return err
 		}
 		args := strings.Split(argsBuilder.String(), " ")
@@ -270,11 +298,11 @@ func (a *App) Apply(ctx context.Context, overwrite bool) error {
 					return nil
 				}
 
-				var le *FileEntry
-				if err := a.Store.Get(FileEntryBucket, pm.Destination, &le); err != nil {
+				var be *FileEntry
+				if err := a.Store.Get(FileEntryBucket, pm.Destination, &be); err != nil {
 					return err
 				}
-				ls, err := le.GetSum()
+				bs, err := be.GetSum()
 				if err != nil {
 					return err
 				}
@@ -283,7 +311,7 @@ func (a *App) Apply(ctx context.Context, overwrite bool) error {
 				// 1. exist in store
 				// 2. checksum is equal to destination
 				// 3. overwrite is false
-				if ls != nil && !bytes.Equal(ls, ds) && !overwrite {
+				if bs != nil && !bytes.Equal(bs, ds) && !overwrite {
 					fmt.Fprintf(a.out, "%s has been modified since the last apply. use --overwrite to overwrite\n", pm.Destination)
 					return nil
 				}

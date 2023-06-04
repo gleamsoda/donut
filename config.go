@@ -100,7 +100,7 @@ func WithDefault() ConfigOption {
 		v.SetDefault("editor", []string{"vim"})
 		v.SetDefault("pager", []string{"less", "-R"})
 		v.SetDefault("diff", []string{"diff", "-upN", "{{.Destination}}", "{{.Source}}"})
-		v.SetDefault("merge", []string{"vimdiff", "{{.Destination}}", "{{.Source}}"})
+		v.SetDefault("merge", []string{"vimdiff", "{{.Destination}}", "{{.Base}}", "{{.Source}}"})
 		return nil
 	}
 }

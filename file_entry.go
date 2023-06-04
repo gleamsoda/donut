@@ -12,12 +12,13 @@ import (
 )
 
 type FileEntry struct {
-	Path    string      `json:"-"`
-	Empty   bool        `json:"empty"`
-	Mode    fs.FileMode `json:"mode"`
-	ModTime time.Time   `json:"mod_time"`
-	sum     []byte
-	content []byte
+	Path      string      `json:"-"`
+	Empty     bool        `json:"empty"`
+	Mode      fs.FileMode `json:"mode"`
+	ModTime   time.Time   `json:"mod_time"`
+	sum       []byte
+	content   []byte
+	IsFetched bool `json:"-"`
 }
 
 var _ json.Marshaler = (*FileEntry)(nil)
@@ -48,7 +49,7 @@ func (e *FileEntry) GetSum() ([]byte, error) {
 	if e == nil || e.Empty {
 		return nil, nil
 	}
-	if e.sum == nil {
+	if e.sum == nil && !e.IsFetched {
 		if err := e.loadSum(); err != nil {
 			return nil, err
 		}
@@ -60,7 +61,7 @@ func (e *FileEntry) GetContent() ([]byte, error) {
 	if e == nil || e.Empty {
 		return nil, nil
 	}
-	if e.content == nil {
+	if e.content == nil && !e.IsFetched {
 		if err := e.loadContent(); err != nil {
 			return nil, err
 		}
@@ -95,12 +96,18 @@ func (e *FileEntry) MarshalJSON() ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
+	content, err := e.GetContent()
+	if err != nil {
+		return nil, err
+	}
 	return json.Marshal(&struct {
 		*Alias
-		Sum []byte `json:"sum"`
+		Sum     []byte `json:"sum"`
+		Content []byte `json:"content"`
 	}{
-		Alias: (*Alias)(e),
-		Sum:   sum,
+		Alias:   (*Alias)(e),
+		Sum:     sum,
+		Content: content,
 	})
 }
 
@@ -110,7 +117,8 @@ func (e *FileEntry) UnmarshalJSON(value []byte) error {
 
 	aux := &struct {
 		*Alias
-		Sum []byte `json:"sum"`
+		Sum     []byte `json:"sum"`
+		Content []byte `json:"content"`
 	}{
 		Alias: (*Alias)(e),
 	}
@@ -119,6 +127,8 @@ func (e *FileEntry) UnmarshalJSON(value []byte) error {
 	}
 
 	e.sum = aux.Sum
+	e.content = aux.Content
+	e.IsFetched = true
 	return nil
 }
 

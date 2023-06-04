@@ -123,7 +123,7 @@ func NewMergeCmd() *cobra.Command {
 			return donut.InitConfig(f)
 		},
 		RunE: func(cmd *cobra.Command, args []string) error {
-			d, err := donut.New(donut.WithConfig(donut.GetConfig()), donut.WithLogger(donut.GetLogger()))
+			d, err := donut.New(donut.WithConfig(donut.GetConfig()), donut.WithStore(donut.GetStore()), donut.WithLogger(donut.GetLogger()))
 			if err != nil {
 				return err
 			}
